@@ -341,7 +341,7 @@
     transition: opacity 0.1s ease;
     z-index: 100;
     white-space: normal;
-    max-width: 260px;
+    max-width: 300px;
   }
 
   .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; }
@@ -719,6 +719,8 @@
 
     let status = '정상';
     const noteParts = [];
+    const reasonDetails = [];
+    const CHANGE_THRESHOLD = 0.2;
     metrics.forEach((m) => {
       const nums = m.values.filter((v) => v !== null);
       if (nums.length < 2) return;
@@ -726,12 +728,19 @@
       const last = nums[nums.length - 1];
       if (first === 0) return;
       const change = Math.abs(last - first) / Math.abs(first);
-      if (change > 0.2) {
+      if (change > CHANGE_THRESHOLD) {
         status = '주의';
-        noteParts.push(`${m.metric} 변화율 약 ${(change * 100).toFixed(0)}%`);
+        const pct = (change * 100).toFixed(0);
+        noteParts.push(`${m.metric} 변화율 약 ${pct}%`);
+        reasonDetails.push(
+          `${m.metric}: ${first.toLocaleString()} → ${last.toLocaleString()} (${pct}% 변화) · 판정 기준(±${(CHANGE_THRESHOLD * 100).toFixed(0)}%) 초과`
+        );
       }
     });
-    textNotes.forEach((n) => noteParts.push(n));
+    textNotes.forEach((n) => {
+      noteParts.push(n);
+      reasonDetails.push(`${n} (육안·관능 관찰 기록)`);
+    });
 
     return {
       name: batchName,
@@ -739,6 +748,7 @@
       weeks,
       metrics,
       notes: noteParts.length ? noteParts.join(', ') : '특이사항 없음',
+      reasonDetails,
       status,
     };
   }
@@ -855,14 +865,18 @@
     bindStatusBadgeTooltips(table, batches);
   }
 
-  // 상태 배지(정상/주의)에 마우스를 올리면 왜 그 상태인지(비고 사유)를
-  // 차트와 동일한 스타일의 툴팁으로 보여준다.
+  // 상태 배지(정상/주의)에 마우스를 올리면 왜 그 상태로 판정됐는지, 비고란
+  // 요약 문구가 아니라 어떤 항목이 얼마나 변해서 판정 기준(±20%)을 넘었는지를
+  // 항목별로 풀어써서 차트와 동일한 스타일의 툴팁으로 보여준다.
   function bindStatusBadgeTooltips(table, batches) {
     const tooltip = document.getElementById('chartTooltip');
     const badges = table.querySelectorAll('tbody .status-badge');
     badges.forEach((el, i) => {
       const b = batches[i];
-      const reason = (b.notes && b.notes.trim()) ? b.notes : '특이사항 없음';
+      const details = b.reasonDetails || [];
+      const reason = details.length
+        ? details.join('<br>')
+        : '모든 측정 항목이 판정 기준(±20%) 이내로, 특이 관찰 기록도 없습니다.';
 
       const moveTooltip = (e) => {
         tooltip.style.left = (e.clientX + 14) + 'px';
