@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>스테빌리티 트래커</title>
+<style>
+  :root {
+    --accent: #C3202E;
+    --accent-soft: rgba(195, 32, 46, 0.08);
+    --gray: #767676;
+    --gray-light: #F5F5F5;
+    --dark: #111111;
+    --text-dark: #111111;
+    --text-gray: #767676;
+    --bg: #ffffff;
+    --border: #e5e5e5;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: #ffffff;
+    color: var(--text-dark);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    word-break: keep-all;
+  }
+
+  .bg-photo-wrap {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: -2;
+  }
+
+  .bg-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    transform: scale(1.03);
+    filter: blur(var(--bg-blur, 0px));
+  }
+
+  .bg-veil {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.92) 55%, rgba(255, 255, 255, 0.98) 100%);
+  }
+
+  header {
+    width: 100%;
+    max-width: 780px;
+    padding: 56px 24px 24px;
+    text-align: center;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--gray-light);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+  }
+
+  .badge-icon {
+    height: 16px;
+    width: auto;
+    display: block;
+  }
+
+  h1 {
+    font-size: 40px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+    line-height: 1.3;
+    margin-bottom: 12px;
+    text-shadow:
+      0.4px 0 currentColor,
+      -0.4px 0 currentColor,
+      0 0.4px currentColor,
+      0 -0.4px currentColor;
+  }
+
+  .accent-text {
+    color: var(--accent);
+  }
+
+  .mobile-only { display: none; }
+
+  @media (max-width: 480px) {
+    .desktop-only { display: none; }
+    .mobile-only { display: inline; }
+  }
+
+  .subtitle {
+    color: var(--text-gray);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  main {
+    width: 100%;
+    max-width: 780px;
+    padding: 8px 24px 64px;
+  }
+
+  .view {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .view[hidden] { display: none; }
+
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 4px 24px rgba(43, 43, 51, 0.04);
+  }
+
+  .field-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+
+  .text-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+
+  .text-input:focus { border-color: var(--accent); }
+
+  .field-hint { font-size: 12px; color: var(--text-gray); margin-top: 8px; line-height: 1.5; }
+
+  .field-error {
+    font-size: 12px;
+    color: var(--accent);
+    margin-top: 8px;
+    line-height: 1.5;
+    display: none;
+  }
+
+  .dropzone {
+    border: 2px dashed #c9c9c9;
+    border-radius: 16px;
+    padding: 48px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    display: block;
+  }
+
+  .dropzone.dragover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+
+  .dropzone .icon { font-size: 40px; margin-bottom: 12px; }
+  .dropzone .main-text { font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+  .dropzone .sub-text { color: var(--text-gray); font-size: 13px; }
+
+  input[type="file"] { display: none; }
+
+  .file-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--gray-light);
+    border-radius: 12px;
+    font-size: 14px;
+  }
+
+  .file-item .file-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 75%;
+  }
+
+  .file-item .remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-gray);
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .step { text-align: center; padding: 8px; }
+
+  .step .num {
+    width: 48px;
+    height: 48px;
+    line-height: 48px;
+    border-radius: 50%;
+    background: var(--gray-light);
+    color: var(--accent);
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0 auto 12px;
+  }
+
+  .step .label { font-size: 15px; font-weight: 500; color: var(--text-gray); line-height: 1.5; }
+
+  .btn {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 14px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s ease, transform 0.1s ease;
+  }
+
+  .btn:active { transform: scale(0.98); }
+
+  .btn-row { display: flex; gap: 12px; }
+  .btn-row .btn { flex: 1; }
+
+  @media (max-width: 480px) {
+    .btn-row { flex-direction: column; }
+  }
+
+  .btn-primary { background: var(--accent); }
+
+  .btn-primary.disabled { opacity: 0.5; pointer-events: none; }
+
+  .btn-secondary {
+    background: var(--bg);
+    color: var(--text-dark);
+    border: 1px solid var(--border);
+  }
+
+  footer { color: var(--text-gray); font-size: 12px; padding-bottom: 32px; text-align: center; }
+
+  /* processing view */
+  .processing-box { text-align: center; padding: 40px 20px; }
+
+  .spinner {
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 20px;
+    border: 4px solid var(--gray-light);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .processing-title { font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+  .processing-sub { color: var(--text-gray); font-size: 13px; }
+
+  /* result view */
+  .card-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .disclaimer {
+    font-size: 12px;
+    color: var(--text-gray);
+    background: var(--gray-light);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 10px 14px;
+    line-height: 1.6;
+  }
+
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+  th, td { padding: 12px 8px; text-align: center; border-bottom: 1px solid var(--border); word-break: keep-all; line-height: 1.5; }
+  th { background: var(--gray-light); color: var(--text-gray); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.02em; }
+  th:first-child { border-top-left-radius: 8px; }
+  th:last-child { border-top-right-radius: 8px; }
+  tbody tr:nth-child(even) { background: #FAFAFA; }
+  tbody tr:hover { background: var(--accent-soft); }
+  td.name-cell { text-align: left; font-weight: 700; }
+  .metric-from { color: var(--text-gray); }
+  .metric-arrow { color: #c9c9c9; margin: 0 2px; }
+  .metric-to { font-weight: 700; }
+
+  .status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .status-ok { background: #EAF7EF; color: #1F9254; }
+  .status-warn { background: var(--accent-soft); color: var(--accent); }
+
+  .table-scroll { overflow-x: auto; }
+
+  canvas { width: 100%; height: 220px; display: block; cursor: crosshair; }
+
+  .chart-tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: #111111;
+    color: #ffffff;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border-left: 3px solid var(--accent);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transition: opacity 0.1s ease;
+    z-index: 100;
+    white-space: nowrap;
+  }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-gray); }
+  .legend-note { font-style: italic; opacity: 0.75; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  #chartsContainer { display: flex; flex-direction: column; gap: 28px; }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 30px; }
+    .step .num { width: 40px; height: 40px; line-height: 40px; font-size: 17px; }
+    .step .label { font-size: 14px; }
+    .card { padding: 20px; }
+    .dropzone { padding: 36px 14px; }
+    .steps { grid-template-columns: 1fr; gap: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-photo-wrap"><img class="bg-photo" id="bgPhoto" src="판교.jpg" alt=""></div>
+<div class="bg-veil"></div>
+
+<header>
+  <div class="badge"><img class="badge-icon" src="코스맥스.png" alt="COSMAX">COSMAX R&I Tool</div>
+  <h1>
+    <span class="desktop-only">안정성시험 데이터, <span class="accent-text">한 번에</span> 정리하기</span>
+    <span class="mobile-only">안정성시험 데이터,<br><span class="accent-text">한 번에</span>&nbsp;정리하기</span>
+  </h1>
+  <p class="subtitle">
+    배치·조건별로 흩어진 화장품 안정성시험 데이터를<br>
+    열 이름을 자동으로 인식해서 취합하고 트렌드 차트까지 만들어드립니다.
+  </p>
+</header>
+
+<main>
+
+  <!-- 1. 업로드 화면 -->
+  <div class="view" id="view-upload">
+    <div class="card">
+      <label class="dropzone" id="dropzone">
+        <div class="icon">📄</div>
+        <div class="main-text">엑셀 파일을 여기에 끌어다 놓으세요</div>
+        <div class="sub-text">
+          <span class="desktop-only">또는 클릭하여 파일 선택 (.xlsx, .xls / 여러 개 선택 가능)</span>
+          <span class="mobile-only">또는 클릭하여 파일 선택 (.xlsx, .xls)<br>여러 개 선택 가능</span>
+        </div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" multiple>
+      </label>
+      <div class="file-list" id="fileList"></div>
+      <div class="field-error" id="formError"></div>
+    </div>
+
+    <div class="card">
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <div class="label">배치·조건별<br>안정성시험 엑셀 업로드</div>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <div class="label">열 이름 키워드로<br>자동 인식 & 정리</div>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <div class="label">요약표 &<br>트렌드 차트 확인</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary disabled" id="startBtn">데이터 취합 시작</button>
+  </div>
+
+  <!-- 2. 처리 중 화면 -->
+  <div class="view" id="view-processing" hidden>
+    <div class="card processing-box">
+      <div class="spinner"></div>
+      <div class="processing-title" id="processingTitle">파일 분석 중...</div>
+      <div class="processing-sub">열 이름을 스캔해서 배치·측정항목을 자동으로 인식하고 있어요</div>
+    </div>
+  </div>
+
+  <!-- 3. 결과 화면 -->
+  <div class="view" id="view-result" hidden>
+    <div class="card">
+      <div class="disclaimer" id="aiSummaryBox">
+        📊 분석 요약이 여기에 표시됩니다.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 배치·조건별 요약표</div>
+      <div class="table-scroll">
+        <table id="summaryTable"></table>
+      </div>
+    </div>
+
+    <div id="chartsContainer"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="downloadExcelBtn">📊 엑셀로 다운로드</button>
+      <button class="btn btn-primary" id="downloadWordBtn">📝 워드로 다운로드</button>
+    </div>
+
+    <button class="btn btn-secondary" id="resetBtn">다시 업로드하기</button>
+  </div>
+
+</main>
+
+<footer>
+  스테빌리티 트래커 · Stability Tracker
+</footer>
+
+<div class="chart-tooltip" id="chartTooltip"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+  // 배경 사진이 object-fit:cover로 화면 가로에 맞춰 채워질 때, 화면이 원본
+  // 사진보다 훨씬 넓으면(전체화면 등) 그만큼 확대되어 화질이 깨져 보인다.
+  // 실제로 얼마나 확대됐는지 계산해서 그 비율만큼만 블러를 걸어준다.
+  (function setupBgPhotoBlur() {
+    const img = document.getElementById('bgPhoto');
+
+    function updateBlur() {
+      if (!img.naturalWidth || !img.naturalHeight) return;
+      const winW = window.innerWidth;
+      const winH = window.innerHeight;
+      // object-fit:cover가 실제로 적용하는 확대 배율(가로/세로 중 더 큰 쪽 기준)
+      const scale = Math.max(winW / img.naturalWidth, winH / img.naturalHeight);
+      const blur = Math.max(0, (scale - 1) * 4.5);
+      img.style.setProperty('--bg-blur', `${blur.toFixed(1)}px`);
+    }
+
+    if (img.complete) updateBlur();
+    img.addEventListener('load', updateBlur);
+    window.addEventListener('resize', updateBlur);
+  })();
+
+  const formError = document.getElementById('formError');
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileList = document.getElementById('fileList');
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const downloadExcelBtn = document.getElementById('downloadExcelBtn');
+  const downloadWordBtn = document.getElementById('downloadWordBtn');
+  const aiSummaryBox = document.getElementById('aiSummaryBox');
+
+  const viewUpload = document.getElementById('view-upload');
+  const viewProcessing = document.getElementById('view-processing');
+  const viewResult = document.getElementById('view-result');
+  const processingTitle = document.getElementById('processingTitle');
+
+  const COLORS = ['#C3202E', '#111111', '#2E5FA3', '#8C232E', '#2E8B74', '#C08A2E'];
+
+  let selectedFiles = [];
+  let lastBatches = [];
+  let lastSummary = '';
+  let lastChartMeta = []; // [{ metricName, canvasId }]
+
+  function showFormError(msg) {
+    formError.textContent = msg;
+    formError.style.display = 'block';
+  }
+  function hideFormError() {
+    formError.style.display = 'none';
+  }
+
+  // --- 파일 업로드 ---
+  function isExcel(file) {
+    return /\.(xlsx|xls)$/i.test(file.name);
+  }
+
+  function addFiles(files) {
+    Array.from(files).filter(isExcel).forEach((file) => {
+      const alreadyAdded = selectedFiles.some(
+        (f) => f.name === file.name && f.size === file.size
+      );
+      if (!alreadyAdded) selectedFiles.push(file);
+    });
+    renderFileList();
+  }
+
+  function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    renderFileList();
+  }
+
+  function renderFileList() {
+    fileList.innerHTML = '';
+    selectedFiles.forEach((file, index) => {
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.innerHTML = `
+        <span class="file-name">${file.name}</span>
+        <button class="remove-btn" data-index="${index}">✕</button>
+      `;
+      fileList.appendChild(item);
+    });
+
+    fileList.querySelectorAll('.remove-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        removeFile(Number(btn.dataset.index));
+      });
+    });
+
+    startBtn.classList.toggle('disabled', selectedFiles.length === 0);
+  }
+
+  fileInput.addEventListener('change', (e) => {
+    addFiles(e.target.files);
+    fileInput.value = '';
+  });
+
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+
+  dropzone.addEventListener('dragleave', () => {
+    dropzone.classList.remove('dragover');
+  });
+
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    addFiles(e.dataTransfer.files);
+  });
+
+  // --- 화면 전환 ---
+
+  function showView(view) {
+    [viewUpload, viewProcessing, viewResult].forEach((v) => v.setAttribute('hidden', ''));
+    view.removeAttribute('hidden');
+  }
+
+  // --- 열 이름 키워드 기반 자동 인식 ---
+  // API 없이 동작해야 하므로, 실제 엑셀 내용을 읽되 AI 대신 헤더 키워드
+  // 매칭으로 배치/조건/측정항목을 판별한다.
+
+  const HEADER_KEYWORDS = {
+    week: ['주차', '경과주', '경과', '시점', 'week', '일차', '측정일', '날짜', 'date'],
+    ph: ['ph'],
+    viscosity: ['점도', 'viscosity', 'visc'],
+    color: ['색상', '색차', 'color', '∆e', 'Δe', 'de값'],
+    odor: ['향', 'odor', 'smell', 'fragrance'],
+    appearance: ['외관', 'appearance'],
+    batch: ['배치', 'batch', '처방', '제품명', 'sample', '시료'],
+    condition: ['조건', 'condition', '온도', 'temp'],
+  };
+
+  const METRIC_LABELS = {
+    ph: 'pH', viscosity: '점도', color: '색상', odor: '향', appearance: '외관',
+  };
+
+  function matchKeyword(cellText, keywords) {
+    if (cellText === undefined || cellText === null) return false;
+    const t = String(cellText).toLowerCase().replace(/\s/g, '');
+    if (!t) return false;
+    return keywords.some((k) => t.includes(k.toLowerCase().replace(/\s/g, '')));
+  }
+
+  function classifyHeader(cellText) {
+    for (const key of Object.keys(HEADER_KEYWORDS)) {
+      if (matchKeyword(cellText, HEADER_KEYWORDS[key])) return key;
+    }
+    return null;
+  }
+
+  function findHeaderRow(rows) {
+    for (let r = 0; r < Math.min(rows.length, 15); r++) {
+      const row = rows[r] || [];
+      const matches = row.filter((cell) => classifyHeader(cell)).length;
+      if (matches >= 2) return r;
+    }
+    return -1;
+  }
+
+  function extractConditionFromText(text) {
+    if (!text) return null;
+    const t = String(text);
+    const tempMatch = t.match(/(\d{2,3})\s*(℃|°c|도)/i);
+    if (tempMatch) return `${tempMatch[1]}℃`;
+    if (/냉장/.test(t)) return '냉장';
+    if (/광\s*안?정?/.test(t)) return '광안정';
+    if (/상온/.test(t)) return '25℃';
+    return null;
+  }
+
+  function toNumber(v) {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    if (typeof v !== 'string') return null;
+    const cleaned = v.replace(/,/g, '').trim();
+    if (cleaned === '') return null;
+    const n = Number(cleaned);
+    return Number.isNaN(n) ? null : n;
+  }
+
+  function parseSheetToBatch(fileName, sheetName, rows, multiSheet) {
+    if (!rows || !rows.length) return null;
+    const headerIdx = findHeaderRow(rows);
+    if (headerIdx === -1) return null;
+
+    const headerRow = rows[headerIdx];
+    const colTypes = headerRow.map((cell) => classifyHeader(cell));
+
+    const weekColIdx = colTypes.indexOf('week');
+    const batchColIdx = colTypes.indexOf('batch');
+    const conditionColIdx = colTypes.indexOf('condition');
+    const metricCols = colTypes
+      .map((type, idx) => ({ type, idx, header: headerRow[idx] }))
+      .filter((c) => c.type && !['week', 'batch', 'condition'].includes(c.type));
+
+    if (!metricCols.length) return null;
+
+    const rawDataRows = rows.slice(headerIdx + 1).filter((r) => r && r.some((c) => c !== undefined && c !== null && c !== ''));
+    if (!rawDataRows.length) return null;
+
+    const weeks = [];
+    const valuesByType = {};
+    metricCols.forEach((mc) => { valuesByType[mc.type] = []; });
+    const textNotes = new Set();
+
+    rawDataRows.forEach((row, i) => {
+      const weekLabel = weekColIdx !== -1 && row[weekColIdx] !== undefined && row[weekColIdx] !== ''
+        ? String(row[weekColIdx]).trim()
+        : `#${i + 1}`;
+
+      let rowHasNumber = false;
+      const rowValues = {};
+      metricCols.forEach((mc) => {
+        const raw = row[mc.idx];
+        const num = toNumber(raw);
+        rowValues[mc.type] = num;
+        if (num !== null) rowHasNumber = true;
+        if (num === null && typeof raw === 'string') {
+          const t = raw.trim();
+          if (t && !/^(정상|이상없음|양호|없음|-|no|ok)$/i.test(t)) {
+            textNotes.add(`${METRIC_LABELS[mc.type] || mc.header}: ${t}`);
+          }
+        }
+      });
+
+      if (!rowHasNumber) return;
+      weeks.push(weekLabel);
+      metricCols.forEach((mc) => valuesByType[mc.type].push(rowValues[mc.type]));
+    });
+
+    if (!weeks.length) return null;
+
+    const metrics = metricCols
+      .filter((mc) => valuesByType[mc.type].some((v) => v !== null))
+      .map((mc) => ({ metric: METRIC_LABELS[mc.type] || String(mc.header), unit: '', values: valuesByType[mc.type] }));
+
+    if (!metrics.length) return null;
+
+    let batchName = null;
+    if (batchColIdx !== -1) {
+      const found = rawDataRows.map((r) => r[batchColIdx]).find((v) => v !== undefined && v !== '');
+      if (found) batchName = String(found).trim();
+    }
+    if (!batchName) {
+      const base = fileName.replace(/\.(xlsx|xls)$/i, '');
+      batchName = multiSheet ? `${base}_${sheetName}` : base;
+    }
+
+    let condition = null;
+    if (conditionColIdx !== -1) {
+      const found = rawDataRows.map((r) => r[conditionColIdx]).find((v) => v !== undefined && v !== '');
+      if (found) condition = String(found).trim();
+    }
+    if (!condition) condition = extractConditionFromText(sheetName) || extractConditionFromText(fileName) || '미상';
+
+    let status = '정상';
+    const noteParts = [];
+    metrics.forEach((m) => {
+      const nums = m.values.filter((v) => v !== null);
+      if (nums.length < 2) return;
+      const first = nums[0];
+      const last = nums[nums.length - 1];
+      if (first === 0) return;
+      const change = Math.abs(last - first) / Math.abs(first);
+      if (change > 0.2) {
+        status = '주의';
+        noteParts.push(`${m.metric} 변화율 약 ${(change * 100).toFixed(0)}%`);
+      }
+    });
+    textNotes.forEach((n) => noteParts.push(n));
+
+    return {
+      name: batchName,
+      condition,
+      weeks,
+      metrics,
+      notes: noteParts.length ? noteParts.join(', ') : '특이사항 없음',
+      status,
+    };
+  }
+
+  async function analyzeFilesHeuristically(files) {
+    const batches = [];
+    for (const file of files) {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const multiSheet = wb.SheetNames.length > 1;
+      wb.SheetNames.forEach((sheetName) => {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: '' });
+        const batch = parseSheetToBatch(file.name, sheetName, rows, multiSheet);
+        if (batch) batches.push(batch);
+      });
+    }
+    return batches;
+  }
+
+  function buildAutoSummary(batches) {
+    if (!batches.length) return '';
+    const warnCount = batches.filter((b) => b.status !== '정상').length;
+    return `총 ${batches.length}개 배치를 분석했습니다. ${warnCount > 0 ? `이 중 ${warnCount}건에서 주의가 필요한 변화가 감지되었습니다.` : '모든 배치가 정상 범위 내에 있습니다.'}`;
+  }
+
+  // --- 시작 버튼: 실제 엑셀 파싱 + 자동 인식 ---
+
+  startBtn.addEventListener('click', async () => {
+    if (startBtn.classList.contains('disabled')) return;
+    hideFormError();
+
+    processingTitle.textContent = `${selectedFiles.length}개 파일 분석 중...`;
+    showView(viewProcessing);
+
+    try {
+      const batches = await analyzeFilesHeuristically(selectedFiles);
+
+      if (!batches.length) {
+        showView(viewUpload);
+        showFormError('열 이름에서 pH·점도·주차 등의 키워드를 찾지 못했습니다. 엑셀 파일의 첫 번째 행이 헤더(항목명)인지 확인해 주세요.');
+        return;
+      }
+
+      lastBatches = batches.map((b, i) => ({ ...b, color: COLORS[i % COLORS.length] }));
+      lastSummary = buildAutoSummary(lastBatches);
+
+      aiSummaryBox.textContent = `📊 분석 요약: ${lastSummary}`;
+      renderSummaryTable(lastBatches);
+      showView(viewResult);
+      renderAllCharts(lastBatches);
+    } catch (err) {
+      showView(viewUpload);
+      showFormError(`분석 중 오류가 발생했습니다: ${err.message}`);
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    selectedFiles = [];
+    renderFileList();
+    showView(viewUpload);
+  });
+
+  // --- 요약표 (측정 항목이 파일마다 달라도 동적으로 열 구성) ---
+
+  function collectMetricNames(batches) {
+    const names = [];
+    batches.forEach((b) => {
+      (b.metrics || []).forEach((m) => {
+        if (!names.includes(m.metric)) names.push(m.metric);
+      });
+    });
+    return names;
+  }
+
+  function getBatchMetric(batch, metricName) {
+    return (batch.metrics || []).find((m) => m.metric === metricName) || null;
+  }
+
+  function formatNum(v) {
+    if (typeof v !== 'number' || Number.isNaN(v)) return '–';
+    return Number.isInteger(v) ? v.toLocaleString() : v.toFixed(2);
+  }
+
+  function statusClass(status) {
+    return status === '정상' ? 'status-ok' : 'status-warn';
+  }
+
+  function renderSummaryTable(batches) {
+    const table = document.getElementById('summaryTable');
+    const metricNames = collectMetricNames(batches);
+
+    const headCols = ['배치', '조건', ...metricNames, '상태', '비고'];
+    const head = `<thead><tr>${headCols.map((c) => `<th>${c}</th>`).join('')}</tr></thead>`;
+
+    const rows = batches.map((b) => {
+      let cells = `<td class="name-cell">${b.name}</td><td>${b.condition}</td>`;
+      metricNames.forEach((mName) => {
+        const m = getBatchMetric(b, mName);
+        if (!m || !m.values || !m.values.length) {
+          cells += `<td>–</td>`;
+        } else {
+          const unit = m.unit || '';
+          cells += `<td>
+            <span class="metric-from">${formatNum(m.values[0])}${unit}</span><span class="metric-arrow">→</span><span class="metric-to">${formatNum(m.values[m.values.length - 1])}${unit}</span>
+          </td>`;
+        }
+      });
+      cells += `<td><span class="status-badge ${statusClass(b.status)}">${b.status}</span></td>`;
+      cells += `<td style="text-align:left;">${b.notes || ''}</td>`;
+      return `<tr>${cells}</tr>`;
+    }).join('');
+
+    table.innerHTML = head + `<tbody>${rows}</tbody>`;
+  }
+
+  // --- 트렌드 차트 (측정 항목별로 카드/캔버스를 동적으로 생성) ---
+
+  // 배치마다 데이터 포인트 개수가 다를 수 있다. 공유 축 길이(가장 긴 배치나
+  // 중앙값 기준)를 쓰면 포인트가 적은 배치는 항상 차트 왼쪽 일부에만 몰려서
+  // 찍히게 된다 (짧은 배치일수록 그 정도가 심해짐). 그래서 각 배치의 선은
+  // "자기 자신의 시작~끝"만을 기준으로 차트 전체 폭에 걸쳐 독립적으로 그려서,
+  // 포인트 개수와 무관하게 항상 고르게(안정적으로) 퍼지도록 한다. 포인트 개수
+  // 차이는 범례에 정보로만 표기한다.
+  function collectSeriesForMetric(batches, metricName) {
+    const relevant = batches
+      .map((b) => ({ b, m: getBatchMetric(b, metricName) }))
+      .filter((x) => x.m && x.m.values && x.m.values.length);
+
+    const seriesBatches = relevant
+      .map(({ b, m }) => {
+        const rawValues = m.values;
+        const rawLabels = (b.weeks && b.weeks.length === rawValues.length) ? b.weeks : rawValues.map((_, i) => `#${i + 1}`);
+
+        // 값이 없는(null) 시점이 배열 뒤쪽에 많이 남아있으면, 그 빈 자리까지
+        // 폭 계산에 끼어들어 실제 데이터가 앞쪽에 눌려 찍힌다. 그래서 값이
+        // 있는 지점만 골라내 그 개수만으로 폭을 계산한다.
+        const values = [];
+        const weekLabels = [];
+        rawValues.forEach((v, i) => {
+          if (v === null || v === undefined) return;
+          values.push(v);
+          weekLabels.push(rawLabels[i]);
+        });
+
+        return { b, values, weekLabels };
+      })
+      .filter((s) => s.values.length);
+
+    // x축 눈금 라벨은 포인트 개수가 가장 많은 배치의 라벨을 참고용으로 사용
+    const refBatch = seriesBatches.slice().sort((a, b) => b.values.length - a.values.length)[0];
+    const axisTicks = refBatch ? refBatch.weekLabels : [];
+    const typicalLen = seriesBatches.length
+      ? seriesBatches.map((s) => s.values.length).sort((a, b) => a - b)[Math.floor((seriesBatches.length - 1) / 2)]
+      : 0;
+
+    return { axisTicks, typicalLen, seriesBatches };
+  }
+
+  function renderAllCharts(batches) {
+    const container = document.getElementById('chartsContainer');
+    container.innerHTML = '';
+    lastChartMeta = [];
+
+    const metricNames = collectMetricNames(batches);
+    metricNames.forEach((metricName, idx) => {
+      const canvasId = `chart_${idx}`;
+      const legendId = `legend_${idx}`;
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="card-title">📈 ${metricName} 추이</div>
+        <canvas id="${canvasId}"></canvas>
+        <div class="legend" id="${legendId}"></div>
+      `;
+      container.appendChild(card);
+
+      lastChartMeta.push({ metricName, canvasId });
+      renderMetricChart(canvasId, legendId, batches, metricName);
+    });
+  }
+
+  function renderMetricChart(canvasId, legendId, batches, metricName) {
+    const canvas = document.getElementById(canvasId);
+    const legend = document.getElementById(legendId);
+    const ctx = canvas.getContext('2d');
+
+    const { axisTicks, typicalLen, seriesBatches } = collectSeriesForMetric(batches, metricName);
+
+    const firstMetric = seriesBatches.length ? getBatchMetric(seriesBatches[0].b, metricName) : null;
+    const unit = (firstMetric && firstMetric.unit) || '';
+    const formatValue = (v) => (unit ? `${Number(v).toLocaleString()}${unit}` : Number(v).toLocaleString());
+
+    const cssWidth = canvas.clientWidth || canvas.parentElement.clientWidth;
+    const cssHeight = 220;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = cssWidth * dpr;
+    canvas.height = cssHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const padding = { top: 16, right: 16, bottom: 28, left: 48 };
+    const plotW = cssWidth - padding.left - padding.right;
+    const plotH = cssHeight - padding.top - padding.bottom;
+
+    const allValues = seriesBatches.flatMap((s) => s.values.filter((v) => v !== null && v !== undefined));
+    const minV = allValues.length ? Math.min(...allValues) : 0;
+    const maxV = allValues.length ? Math.max(...allValues) : 1;
+    const range = (maxV - minV) || 1;
+    const yMin = minV - range * 0.15;
+    const yMax = maxV + range * 0.15;
+
+    // 각 배치는 자기 자신의 포인트 개수를 기준으로 0%~100% 폭에 독립적으로
+    // 펼쳐서 그린다 (배치마다 개수가 달라도 항상 고르게 퍼지도록).
+    function xAt(i, len) {
+      return len > 1 ? padding.left + (plotW * i) / (len - 1) : padding.left + plotW / 2;
+    }
+    function yAt(v) {
+      return padding.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+    }
+
+    const points = [];
+    seriesBatches.forEach(({ b, values, weekLabels }) => {
+      values.forEach((v, i) => {
+        if (v === null || v === undefined) return;
+        points.push({ x: xAt(i, values.length), y: yAt(v), name: b.name, condition: b.condition, week: weekLabels[i], value: v, color: b.color });
+      });
+    });
+
+    function draw(hoverPoint) {
+      ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+      ctx.strokeStyle = '#e5e5e5';
+      ctx.lineWidth = 1;
+      ctx.font = '11px sans-serif';
+      ctx.fillStyle = '#767676';
+      const gridLines = 4;
+      for (let g = 0; g <= gridLines; g++) {
+        const v = yMin + ((yMax - yMin) * g) / gridLines;
+        const y = yAt(v);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(cssWidth - padding.right, y);
+        ctx.stroke();
+        ctx.fillText(formatValue(v), 2, y + 3);
+      }
+
+      axisTicks.forEach((w, i) => {
+        ctx.fillText(w, xAt(i, axisTicks.length) - 8, cssHeight - 8);
+      });
+
+      seriesBatches.forEach(({ b, values }) => {
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        let started = false;
+        values.forEach((v, i) => {
+          if (v === null || v === undefined) { started = false; return; }
+          const x = xAt(i, values.length);
+          const y = yAt(v);
+          if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+        });
+        ctx.stroke();
+
+        ctx.fillStyle = b.color;
+        values.forEach((v, i) => {
+          if (v === null || v === undefined) return;
+          ctx.beginPath();
+          ctx.arc(xAt(i, values.length), yAt(v), 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      });
+
+      if (hoverPoint) {
+        ctx.beginPath();
+        ctx.arc(hoverPoint.x, hoverPoint.y, 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = hoverPoint.color;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+      }
+    }
+
+    draw(null);
+
+    canvas._points = points;
+    canvas._draw = draw;
+    canvas._formatValue = formatValue;
+
+    if (!canvas._hoverBound) {
+      canvas._hoverBound = true;
+      const tooltip = document.getElementById('chartTooltip');
+
+      canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        let nearest = null;
+        let minDist = Infinity;
+        canvas._points.forEach((p) => {
+          const dist = Math.hypot(p.x - mx, p.y - my);
+          if (dist < minDist) { minDist = dist; nearest = p; }
+        });
+
+        if (nearest && minDist <= 14) {
+          canvas._draw(nearest);
+          tooltip.style.borderLeftColor = nearest.color;
+          tooltip.innerHTML = `<strong>${nearest.name}</strong> (${nearest.condition})<br>${nearest.week} · ${canvas._formatValue(nearest.value)}`;
+          tooltip.style.left = (e.clientX + 14) + 'px';
+          tooltip.style.top = (e.clientY + 14) + 'px';
+          tooltip.style.opacity = '1';
+        } else {
+          canvas._draw(null);
+          tooltip.style.opacity = '0';
+        }
+      });
+
+      canvas.addEventListener('mouseleave', () => {
+        canvas._draw(null);
+        tooltip.style.opacity = '0';
+      });
+    }
+
+    legend.innerHTML = seriesBatches.map(({ b, values }) => {
+      const note = values.length !== typicalLen
+        ? ` <span class="legend-note">· 총 ${values.length}개 시점</span>`
+        : '';
+      return `
+        <div class="legend-item">
+          <span class="legend-dot" style="background:${b.color}"></span>${b.name} (${b.condition})${note}
+        </div>
+      `;
+    }).join('');
+  }
+
+  // --- 다운로드 ---
+  // 별도 라이브러리 없이 한 파일로 동작해야 해서, Excel/Word가 열 수 있는
+  // HTML 형식으로 저장하는 방식(.xls / .doc)을 사용한다. 실제로 다운로드되고
+  // 더블클릭하면 Excel/Word에서 바로 열린다.
+
+  function triggerDownload(filename, mime, content) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // data: URI 이미지는 Word/Excel의 자체 HTML 파서에서 대부분 렌더링되지 않는다.
+  // 대신 MHTML(Web Archive) 포맷으로 패키징해서 이미지를 별도 파트로 첨부하면
+  // Content-Location으로 참조된 이미지가 Word/Excel 양쪽에서 정상적으로 보인다.
+  function toMhtml(htmlDoc, images) {
+    const boundary = 'MHTML_BOUNDARY_STABILITY_TRACKER';
+    const encodeBase64Lines = (b64) => (b64.match(/.{1,76}/g) || []).join('\r\n');
+
+    let out = 'MIME-Version: 1.0\r\n';
+    out += `Content-Type: multipart/related; boundary="${boundary}"; type="text/html"\r\n\r\n`;
+
+    out += `--${boundary}\r\n`;
+    out += 'Content-Type: text/html; charset="utf-8"\r\n';
+    out += 'Content-Transfer-Encoding: 8bit\r\n';
+    out += 'Content-Location: report.html\r\n\r\n';
+    out += htmlDoc + '\r\n\r\n';
+
+    images.forEach((img) => {
+      const base64 = img.dataUrl.split(',')[1];
+      out += `--${boundary}\r\n`;
+      out += 'Content-Type: image/png\r\n';
+      out += 'Content-Transfer-Encoding: base64\r\n';
+      out += `Content-Location: ${img.filename}\r\n\r\n`;
+      out += encodeBase64Lines(base64) + '\r\n\r\n';
+    });
+
+    out += `--${boundary}--\r\n`;
+    return out;
+  }
+
+  function buildReportBodyHtml(images) {
+    const dateStr = new Date().toLocaleString('ko-KR');
+    const metricNames = collectMetricNames(lastBatches);
+
+    const thStyle = 'padding:10px 8px; border-bottom:1px solid #e5e5e5; color:#767676; font-size:12px; font-weight:600;';
+    const tdStyle = 'padding:10px 8px; border-bottom:1px solid #e5e5e5; text-align:center; font-size:13px;';
+
+    const headCols = ['배치', '조건', ...metricNames, '상태', '비고'];
+
+    const rows = lastBatches.map((b) => {
+      let cells = `<td style="${tdStyle} text-align:left; font-weight:600;">${b.name}</td><td style="${tdStyle}">${b.condition}</td>`;
+      metricNames.forEach((mName) => {
+        const m = getBatchMetric(b, mName);
+        if (!m || !m.values || !m.values.length) {
+          cells += `<td style="${tdStyle}">–</td>`;
+        } else {
+          const unit = m.unit || '';
+          cells += `<td style="${tdStyle}">${formatNum(m.values[0])}${unit} → ${formatNum(m.values[m.values.length - 1])}${unit}</td>`;
+        }
+      });
+      cells += `<td style="${tdStyle}">
+        <span style="display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700;
+          background:${b.status === '정상' ? '#EAF7EF' : 'rgba(195,32,46,0.08)'}; color:${b.status === '정상' ? '#1F9254' : '#C3202E'};">
+          ${b.status}
+        </span>
+      </td>`;
+      cells += `<td style="${tdStyle} text-align:left; white-space:normal;">${b.notes || ''}</td>`;
+      return `<tr>${cells}</tr>`;
+    }).join('');
+
+    const table = `
+      <table style="width:100%; border-collapse:collapse; font-family:'Malgun Gothic',sans-serif;">
+        <thead><tr>${headCols.map((c) => `<th style="${thStyle}">${c}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+
+    // Word/Excel의 HTML 변환기는 크기 정보가 없거나 반응형(%) 크기만 있으면
+    // 이미지를 같은 자리에 겹쳐서 배치하는 경우가 있다. 그래서 각 차트를
+    // 독립된 블록(div)으로 감싸고, width/height 속성에 실제 픽셀 크기를
+    // 명시해서 겹치지 않고 순서대로 쌓이도록 한다.
+    const chartsHtml = images.map((img) => `
+      <div style="display:block; clear:both; margin:0 0 28px; page-break-inside:avoid;">
+        <h2 style="font-size:16px; margin:0 0 12px;">📈 ${img.metricName} 추이</h2>
+        <img src="${img.filename}" width="${img.width}" height="${img.height}"
+          style="display:block; width:100%; max-width:600px; height:auto;">
+      </div>
+    `).join('');
+
+    return `
+      <div style="font-family:'Malgun Gothic',sans-serif; color:#111111; max-width:700px; margin:0 auto;">
+        <div style="text-align:center; padding-bottom:24px;">
+          <div style="display:inline-block; background:#F5F5F5; color:#C3202E; font-size:12px; font-weight:700; padding:5px 12px; border-radius:999px; margin-bottom:12px;">COSMAX R&I Tool</div>
+          <h1 style="font-size:22px; margin-bottom:8px;">안정성시험 데이터 리포트</h1>
+          <p style="color:#767676; font-size:13px;">스테빌리티 트래커 · Stability Tracker &nbsp;|&nbsp; 생성일시: ${dateStr}</p>
+        </div>
+
+        <div style="background:#F5F5F5; border-left:3px solid #C3202E; border-radius:6px; padding:12px 16px; font-size:12px; color:#767676; margin-bottom:20px;">
+          📊 분석 요약: ${lastSummary || ''}
+        </div>
+
+        <h2 style="font-size:16px; margin-bottom:12px;">📋 배치·조건별 요약표</h2>
+        ${table}
+        ${chartsHtml}
+      </div>
+    `;
+  }
+
+  function buildReportDocument() {
+    const images = lastChartMeta.map((meta, idx) => {
+      const canvas = document.getElementById(meta.canvasId);
+      return {
+        filename: `chart-${idx}.png`,
+        dataUrl: canvas.toDataURL('image/png'),
+        metricName: meta.metricName,
+        width: canvas.clientWidth || 600,
+        height: canvas.clientHeight || 220,
+      };
+    });
+
+    const bodyHtml = buildReportBodyHtml(images);
+    const htmlDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>${bodyHtml}</body></html>`;
+
+    return {
+      htmlDoc,
+      images: images.map(({ filename, dataUrl }) => ({ filename, dataUrl })),
+    };
+  }
+
+  downloadExcelBtn.addEventListener('click', () => {
+    if (!lastBatches.length) return;
+    const { htmlDoc, images } = buildReportDocument();
+    triggerDownload('스테빌리티_트래커_요약.xls', 'application/vnd.ms-excel', toMhtml(htmlDoc, images));
+  });
+
+  downloadWordBtn.addEventListener('click', () => {
+    if (!lastBatches.length) return;
+    const { htmlDoc, images } = buildReportDocument();
+    triggerDownload('스테빌리티_트래커_리포트.doc', 'application/msword', toMhtml(htmlDoc, images));
+  });
+</script>
+
+</body>
+</html>
