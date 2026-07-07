@@ -316,6 +316,7 @@
     border-radius: 999px;
     font-size: 12px;
     font-weight: 700;
+    cursor: help;
   }
 
   .status-ok { background: #EAF7EF; color: #1F9254; }
@@ -339,7 +340,8 @@
     opacity: 0;
     transition: opacity 0.1s ease;
     z-index: 100;
-    white-space: nowrap;
+    white-space: normal;
+    max-width: 260px;
   }
 
   .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; }
@@ -850,6 +852,34 @@
     }).join('');
 
     table.innerHTML = head + `<tbody>${rows}</tbody>`;
+    bindStatusBadgeTooltips(table, batches);
+  }
+
+  // 상태 배지(정상/주의)에 마우스를 올리면 왜 그 상태인지(비고 사유)를
+  // 차트와 동일한 스타일의 툴팁으로 보여준다.
+  function bindStatusBadgeTooltips(table, batches) {
+    const tooltip = document.getElementById('chartTooltip');
+    const badges = table.querySelectorAll('tbody .status-badge');
+    badges.forEach((el, i) => {
+      const b = batches[i];
+      const reason = (b.notes && b.notes.trim()) ? b.notes : '특이사항 없음';
+
+      const moveTooltip = (e) => {
+        tooltip.style.left = (e.clientX + 14) + 'px';
+        tooltip.style.top = (e.clientY + 14) + 'px';
+      };
+
+      el.addEventListener('mouseenter', (e) => {
+        tooltip.style.borderLeftColor = b.status === '정상' ? '#1F9254' : '#C3202E';
+        tooltip.innerHTML = `<strong>${b.status}</strong><br>${reason}`;
+        tooltip.style.opacity = '1';
+        moveTooltip(e);
+      });
+      el.addEventListener('mousemove', moveTooltip);
+      el.addEventListener('mouseleave', () => {
+        tooltip.style.opacity = '0';
+      });
+    });
   }
 
   // --- 트렌드 차트 (측정 항목별로 카드/캔버스를 동적으로 생성) ---
