@@ -885,12 +885,16 @@
       })
       .filter((s) => s.values.length);
 
-    // x축 눈금 라벨은 포인트 개수가 가장 많은 배치의 라벨을 참고용으로 사용
-    const refBatch = seriesBatches.slice().sort((a, b) => b.values.length - a.values.length)[0];
-    const axisTicks = refBatch ? refBatch.weekLabels : [];
     const typicalLen = seriesBatches.length
       ? seriesBatches.map((s) => s.values.length).sort((a, b) => a - b)[Math.floor((seriesBatches.length - 1) / 2)]
       : 0;
+
+    // x축 눈금 라벨은 포인트 개수가 가장 많은(때로는 비정상적으로 튀는) 배치
+    // 대신, 개수가 중앙값(typicalLen)에 가장 가까운 대표 배치의 라벨을 쓴다.
+    const refBatch = seriesBatches.length
+      ? seriesBatches.slice().sort((a, b) => Math.abs(a.values.length - typicalLen) - Math.abs(b.values.length - typicalLen))[0]
+      : null;
+    const axisTicks = refBatch ? refBatch.weekLabels : [];
 
     return { axisTicks, typicalLen, seriesBatches, refBatch };
   }
