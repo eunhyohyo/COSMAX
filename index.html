@@ -250,6 +250,8 @@
 
   .btn-primary.disabled { opacity: 0.5; pointer-events: none; }
 
+  #startBtn { background: #EA0A2A; }
+
   .btn-secondary {
     background: var(--bg);
     color: var(--text-dark);
@@ -890,7 +892,7 @@
       ? seriesBatches.map((s) => s.values.length).sort((a, b) => a - b)[Math.floor((seriesBatches.length - 1) / 2)]
       : 0;
 
-    return { axisTicks, typicalLen, seriesBatches };
+    return { axisTicks, typicalLen, seriesBatches, refBatch };
   }
 
   function renderAllCharts(batches) {
@@ -922,7 +924,7 @@
     const legend = document.getElementById(legendId);
     const ctx = canvas.getContext('2d');
 
-    const { axisTicks, typicalLen, seriesBatches } = collectSeriesForMetric(batches, metricName);
+    const { axisTicks, typicalLen, seriesBatches, refBatch } = collectSeriesForMetric(batches, metricName);
 
     const firstMetric = seriesBatches.length ? getBatchMetric(seriesBatches[0].b, metricName) : null;
     const unit = (firstMetric && firstMetric.unit) || '';
@@ -946,20 +948,47 @@
     const yMin = minV - range * 0.15;
     const yMax = maxV + range * 0.15;
 
-    // 각 배치는 자기 자신의 포인트 개수를 기준으로 0%~100% 폭에 독립적으로
-    // 펼쳐서 그린다 (배치마다 개수가 달라도 항상 고르게 퍼지도록).
-    function xAt(i, len) {
-      return len > 1 ? padding.left + (plotW * i) / (len - 1) : padding.left + plotW / 2;
+    // 각 배치는 자기 자신의 값 변화 패턴을 기준으로 0%~100% 폭에 독립적으로
+    // 펼쳐서 그린다. 값이 이전 지점과 거의 같은(변화 없는) 구간은 X축 폭을
+    // 좁게 모으고, 값이 실제로 변하는 구간은 넓게 펼쳐서 변화가 잘 보이도록 한다.
+    // 변화 없는 구간이 아무리 길게(수백~수천 시점) 이어져도 폭이 계속 커지지
+    // 않도록, 같은 방향으로 "변화 없음"이 반복될수록 폭 기여도를 지수적으로
+    // 줄인다(등비수열이라 무한히 이어져도 전체 폭은 수렴한다).
+    const FLAT_WEIGHT = 0.15;
+    const FLAT_DECAY = 0.85;
+    const changeThreshold = range * 0.02;
+    function xPositionsFor(values) {
+      const n = values.length;
+      if (n <= 1) return values.map(() => padding.left + plotW / 2);
+      const weights = [0];
+      let flatRun = 0;
+      for (let i = 1; i < n; i++) {
+        const diff = Math.abs(values[i] - values[i - 1]);
+        if (diff > changeThreshold) {
+          weights.push(1);
+          flatRun = 0;
+        } else {
+          weights.push(FLAT_WEIGHT * Math.pow(FLAT_DECAY, flatRun));
+          flatRun += 1;
+        }
+      }
+      let sum = 0;
+      const cum = weights.map((w) => (sum += w));
+      const total = sum || 1;
+      return cum.map((c) => padding.left + (c / total) * plotW);
     }
     function yAt(v) {
       return padding.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
     }
 
+    const axisXs = refBatch ? xPositionsFor(refBatch.values) : [];
+
     const points = [];
     seriesBatches.forEach(({ b, values, weekLabels }) => {
+      const xs = xPositionsFor(values);
       values.forEach((v, i) => {
         if (v === null || v === undefined) return;
-        points.push({ x: xAt(i, values.length), y: yAt(v), name: b.name, condition: b.condition, week: weekLabels[i], value: v, color: b.color });
+        points.push({ x: xs[i], y: yAt(v), name: b.name, condition: b.condition, week: weekLabels[i], value: v, color: b.color });
       });
     });
 
@@ -982,17 +1011,18 @@
       }
 
       axisTicks.forEach((w, i) => {
-        ctx.fillText(w, xAt(i, axisTicks.length) - 8, cssHeight - 8);
+        ctx.fillText(w, (axisXs[i] ?? padding.left) - 8, cssHeight - 8);
       });
 
       seriesBatches.forEach(({ b, values }) => {
+        const xs = xPositionsFor(values);
         ctx.strokeStyle = b.color;
         ctx.lineWidth = 2;
         ctx.beginPath();
         let started = false;
         values.forEach((v, i) => {
           if (v === null || v === undefined) { started = false; return; }
-          const x = xAt(i, values.length);
+          const x = xs[i];
           const y = yAt(v);
           if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
         });
@@ -1002,7 +1032,7 @@
         values.forEach((v, i) => {
           if (v === null || v === undefined) return;
           ctx.beginPath();
-          ctx.arc(xAt(i, values.length), yAt(v), 3, 0, Math.PI * 2);
+          ctx.arc(xs[i], yAt(v), 3, 0, Math.PI * 2);
           ctx.fill();
         });
       });
