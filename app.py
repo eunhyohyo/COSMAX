@@ -29,13 +29,13 @@ def to_data_uri(filename: str, mime: str) -> str:
     return f"data:{mime};base64,{encoded}"
 
 
-@st.cache_data
-def load_html(_mtime: float) -> str:
-    """_mtime은 index.html이 바뀔 때마다 캐시를 무효화하기 위한 캐시 키다.
+def load_html() -> str:
+    """매 실행(rerun)마다 index.html을 다시 읽는다.
 
-    st.cache_data는 함수 소스코드가 바뀌지 않으면 캐시를 재사용하는데,
-    load_html 자체 코드는 그대로고 index.html 내용만 바뀌는 경우가 잦아서
-    파일 수정시각을 인자로 넘겨 내용이 바뀌면 캐시가 자동으로 갱신되게 한다.
+    st.cache_data로 캐싱하면 index.html만 수정했을 때 반영되지 않고 예전
+    내용이 계속 떠서(로컬 재시작 전까지, 또는 배포 환경의 캐시 정책에 따라)
+    혼란을 주므로, 파일이 작아 매번 새로 읽어도 비용이 무시할 만한 점을
+    감안해 캐싱하지 않는다.
     """
     html = HTML_PATH.read_text(encoding="utf-8")
     for filename, mime in IMAGE_FILES.items():
@@ -44,7 +44,7 @@ def load_html(_mtime: float) -> str:
     return html
 
 
-html_content = load_html(HTML_PATH.stat().st_mtime)
+html_content = load_html()
 
 # 업로드 -> 처리중 -> 결과(표+차트) 화면까지 모두 한 페이지 안에서
 # JS로 전환되는 구조라서, 넉넉한 높이 + 내부 스크롤을 켜서 렌더링한다.
